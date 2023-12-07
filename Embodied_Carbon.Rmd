@@ -1,0 +1,131 @@
+---
+title: "Embodied_Carbon"
+author: "Cassandra Etter"
+date: '2023-12-06'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Embodied Carbon Projections 
+
+This is the second tranche of work which builds on the indicators RMkdwn in this project. It takes Building stock estimates to 2050 and adds embodied carbon estimates. Please refer to first mkdown for earlier work. 
+
+Overview: Data for GlobalABC Project on construction and building indicators and projections
+This is the repository containing the source code and documentation for the Global ABC baseline assessment and indicators and projections for gap analysis. 
+The point of the project is to 
+1) gain a good understanding of the context 
+2) identify challenges and opportunities and 
+3) measure the objective achievement gap. 
+
+The project was carried out by UNOPS.
+
+##import library
+```{r}
+library(data.table)
+library(dplyr)
+library(countrycode)
+library(readxl)
+library(tidyr)
+library(googlesheets4)
+library(tidyverse)
+```
+
+## Importing Datasets 
+
+To find embodied carbon estimates by country we use EXIOBASE3, a multi-regional input output database with access to 47 countries and 5 regions. 
+```{r}
+### importing MRIO into working environment 
+
+D_cba <- fread("~/Downloads/IOT_2022_ixi/satellite/D_cba.txt")
+D_cba_impact <- fread("~/Downloads/IOT_2022_ixi/impacts/D_cba.txt")
+
+M_impact <- fread("~/Downloads/IOT_2022_ixi/impacts/M.txt")
+
+exio3_iso2 <- fread("~/Downloads/IOT_2022_ixi/impacts/D_cba.txt", 
+                    nrows = 1, header = FALSE) %>% unlist %>% tail(-1)
+
+exio3_sectors <- fread("~/Downloads/IOT_2022_ixi/impacts/D_cba.txt", 
+                    nrows = 2, header = FALSE)[2,] %>% unlist %>% tail(-1)
+
+
+D_cba_impact[region == "GHG emissions (GWP100) | Problem oriented approach: baseline (CML, 2001) | GWP100 (IPCC, 2007)"]
+
+exio_ghg <- data.table(
+        iso3 = exio3_iso2 %>% countrycode("iso2c", "iso3c"),
+        sector = exio3_sectors,
+        ghg_int = M_impact[region == "GHG emissions (GWP100) | Problem oriented approach: baseline (CML, 2001) | GWP100 (IPCC, 2007)"] %>% 
+                unlist %>% tail(-1) %>% as.numeric,
+        ghg_tot = D_cba_impact[region == "GHG emissions (GWP100) | Problem oriented approach: baseline (CML, 2001) | GWP100 (IPCC, 2007)"] %>% 
+                unlist %>% tail(-1) %>% as.numeric) 
+
+exio_ghg <- exio_ghg %>%
+        mutate(Country = countrycode(iso3, "iso3c", "country.name"))
+```
+
+##Pulling relevant products from MRIO 
+
+We now pull subset for Construction, Manufacture of cement, lime and plaster, Manufacture of basic iron and steel and of ferro-alloys and first products thereof Aluminium production. This is based on UNOPS recommendation for these products accounting for most embodied emissions in buildings. 
+```{r}
+list_substet <-c("Manufacture of cement, lime and plaster", "Aluminium production" ,"Construction (45)","Manufacture of basic iron and steel and of ferro-alloys and first products thereof")
+subset_exio_ghg <- exio_ghg %>% subset(sector %in% list_substet)
+```
+##Import ICP Data on Costs
+
+We now use the World Bank's International Comparison Programme data. This data collects comparative price data and detailed GDP expenditures to produce a PPP. This will allow us to take the import/ export data from above and allow for comparison across different countries. All goods are benchmarked to 2017.
+
+
+
+For missing country data, we apply the listed regional assumptions. We then compare all countries against one country for the comparison, and select Germany as the country selected does not matter for the analysis. Regional assumptions and their comparison cost are below: 
+
+East Asia and Pacific	91.774	967.82
+Europe and Central Asia	120.756	1,273.45
+Latin America and Caribbean	88.581	934.15
+Middle East and North Africa	60.452	637.51
+North America	249.646	2,632.69
+Sub Saharan Africa	67.229	708.98
+South Asia 	42.897	452.38
+World (Other) 	100	1,054.57
+
+
+```{r}
+Construction <- read_csv("construction_costs.csv") 
+
+```
+
+##Estimate Embodied Emissions of buildings and construction 
+
+Bring in building stock information from first Markdown and add in construction intensity data
+
+```{r}
+BS_2050 <- read.csv("BS_2050.csv")
+
+Costs_2 <- BS_2050 %>%
+        left_join(construction_costs, by = "iso3c") %>%
+        select(c(Country.Name, iso3c, year, total_building_stock_m2, `Construction Comparative`)) %>%
+        mutate(Total_Cost = total_building_stock_m2 * `Construction Comparative`) %>%
+        rename(iso3c = iso3)
+```
+
+Add building intensity data to this dataset 
+
+```{r}
+Embodied_Carbon <- Costs_2 %>%
+        left_join(Construction_intensity, by = "iso3c") %>%
+        left_join(Building_intensity, by = "iso3c") %>%
+        select(c(Country.Name, iso3c, year, total_building_stock_m2, `Construction Comparative`, Total_Cost, 
+                 Construction_GHG_Intensity, Building_GHG_Intensity, ))
+```
+From here there are a number of missing data that need to be added on embodied construction and building intensity. Take regional estimates and apply them to countries in that region. The regional figures provided are:  
+
+East Asia and Pacific	367489.6482	14047106.88
+Europe and Central Asia	429531.0633	4688629.699
+Latin America and Caribbean	487166.6121	13408428.28
+Middle East and North Africa	938445.1	15011385
+North America	284101.1124	8734324.867
+Sub Saharan Africa	899792.8	62727133
+
+```{r}
+Embodied_Carbon <- read_csv("Embodied_Carbon.csv")

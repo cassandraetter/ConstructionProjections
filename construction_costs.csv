@@ -1,0 +1,177 @@
+Country,iso3c,ICP Construction Cost,Construction Comparative
+Afghanistan,AFG,60.452,637.51
+Australia,AUS,265.747,"2,802.48"
+Brunei Darussalam,BRN,62.636,660.54
+Cambodia,KHM,43.59,459.69
+China,CHN,90.368,952.99
+Fiji,FJI,60.489,637.9
+"Hong Kong SAR, China",HKG,138.105,"1,456.41"
+Indonesia,IDN,40.088,422.76
+Japan,JPN,248.928,"2,625.12"
+"Korea, Rep.",KOR,121.544,"1,281.76"
+Lao PDR,LAO,42.577,449
+Malaysia,MYS,47.281,498.61
+Mongolia,MNG,47.253,498.32
+Myanmar,MMR,33.35,351.7
+New Zealand,NZL,307.322,"3,240.92"
+Philippines,PHL,55.222,582.35
+Singapore,SGP,93.64,987.5
+"Taiwan, China",TWN,83.003,875.32
+Thailand,THA,46.397,489.29
+Vietnam,VNM,46.373,489.04
+Albania,ALB,58.633,618.33
+Armenia,ARM,99.415,"1,048.40"
+Austria,AUT,152.542,"1,608.66"
+Azerbaijan,AZE,83.761,883.32
+Belarus,BLR,87.369,921.37
+Belgium,BEL,139.112,"1,467.03"
+Bosnia and Herzegovina,BIH,55.402,584.25
+Bulgaria,BGR,63.961,674.51
+Croatia,HRV,69.843,736.54
+Cyprus,CYP,94.267,994.11
+Czech Republic,CZE,88.979,938.34
+Denmark,DNK,191.095,"2,015.23"
+Estonia,EST,105.982,"1,117.65"
+Finland,FIN,205.263,"2,164.64"
+France,FRA,162.947,"1,718.39"
+Georgia,GEO,48.925,515.95
+Germany,DEU,189.651,2000
+Greece,GRC,85.214,898.64
+Hungary,HUN,76.898,810.94
+Iceland,ISL,253.832,"2,676.83"
+Ireland,IRL,135.89,"1,433.05"
+Italy,ITA,105.519,"1,112.77"
+Kazakhstan,KAZ,97.458,"1,027.76"
+Kyrgyzstan,KGZ,77.78,820.24
+Latvia,LVA,89.202,940.7
+Lithuania,LTU,91.936,969.53
+Luxembourg,LUX,148.553,"1,566.59"
+Moldova,MDA,98.326,"1,036.92"
+Montenegro,MNE,68.451,721.86
+Netherlands,NLD,152.764,"1,611.00"
+North Macedonia,MKD,54.197,571.54
+Norway,NOR,221.532,"2,336.21"
+Poland,POL,87.079,918.31
+Portugal,PRT,75.194,792.97
+Romania,ROU,57.918,610.79
+Russian Federation,RUS,105.656,"1,114.22"
+Serbia,SRB,65.141,686.96
+Slovakia,SVK,94.005,991.35
+Slovenia,SVN,89.746,946.43
+Spain,ESP,100.673,"1,061.67"
+Sweden,SWE,231.436,"2,440.65"
+Switzerland,CHE,244.346,"2,576.80"
+Tajikistan,TJK,78.813,831.14
+Turkey,TUR,49.558,522.62
+Ukraine,UKR,34.943,368.5
+United Kingdom,GBR,137.974,"1,455.03"
+Anguilla,AIA,172.917,"1,823.53"
+Antigua and Barbuda,ATG,136.905,"1,443.76"
+Argentina,ARG,105.017,"1,107.48"
+Aruba,ABW,176.822,"1,864.71"
+"Bahamas, The",BHS,137.287,"1,447.79"
+Barbados,BRB,126.076,"1,329.56"
+Belize,BLZ,94.169,993.08
+Bolivia,BOL,70.895,747.64
+Brazil,BRA,83.013,875.43
+Cayman Islands,CYM,175.881,"1,854.79"
+Chile,CHL,94.378,995.28
+Colombia,COL,99.788,"1,052.33"
+Costa Rica,CRI,126.699,"1,336.13"
+Curaçao,CUW,163.247,"1,721.55"
+Dominica,DMA,134.744,"1,420.97"
+Dominican Republic,DOM,61.824,651.98
+Ecuador,ECU,71.922,758.47
+El Salvador,SLV,56.975,600.84
+Grenada,GRD,144.82,"1,527.23"
+Guyana,GUY,71.552,754.56
+Haiti,HTI,67.977,716.86
+Honduras,HND,59.378,626.18
+Jamaica,JAM,113.846,"1,200.58"
+Mexico,MEX,91.94,969.57
+Montserrat,MSR,131.562,"1,387.41"
+Nicaragua,NIC,77.549,817.81
+Panama,PAN,87.254,920.15
+Paraguay,PRY,84.19,887.84
+Peru,PER,82.028,865.04
+Sint Maarten,SXM,188.148,"1,984.15"
+St. Kitts and Nevis,KNA,120.386,"1,269.55"
+St. Lucia,LCA,123.554,"1,302.96"
+St. Vincent and the Grenadines,VCT,99.203,"1,046.16"
+Suriname,SUR,48.322,509.59
+Trinidad and Tobago,TTO,98.094,"1,034.47"
+Turks and Caicos Islands,TCA,187.047,"1,972.54"
+Uruguay,URY,136.416,"1,438.60"
+"Virgin Islands, British",VGB,264.213,"2,786.31"
+Algeria,DZA,70.362,742.02
+Bahrain,BHR,60.771,640.87
+Djibouti,DJI,104.909,"1,106.34"
+"Egypt, Arab Rep.",EGY,38.723,408.36
+"Iran, Islamic Rep.",IRN,49.75,524.65
+Iraq,IRQ,66.057,696.62
+Israel,ISR,196.048,"2,067.46"
+Jordan,JOR,64.215,677.19
+Kuwait,KWT,65.257,688.18
+Malta,MLT,105.867,"1,116.44"
+Morocco,MAR,48.651,513.06
+Oman,OMN,50.909,536.87
+Qatar,QAT,65.862,694.56
+Saudi Arabia,SAU,53.032,559.26
+Tunisia,TUN,70.231,740.63
+United Arab Emirates,ARE,56.834,599.35
+West Bank and Gaza,PSE,91.107,960.79
+Bermuda,BMU,289.478,"3,052.74"
+Canada,CAN,185.764,"1,959.01"
+United States,USA,264.142,"2,785.56"
+Bangladesh,BGD,48.05,506.72
+Bhutan,BTN,42.983,453.29
+India,IND,41.832,441.15
+Maldives,MDV,57.854,610.11
+Nepal,NPL,50.065,527.97
+Pakistan,PAK,46.03,485.42
+Sri Lanka,LKA,47.813,504.22
+Angola,AGO,70.454,742.99
+Benin,BEN,67.752,714.49
+Botswana,BWA,59.582,628.33
+Burkina Faso,BFA,62.359,657.62
+Burundi,BDI,73.646,776.65
+Cameroon,CMR,73.217,772.12
+Cabo Verde,CPV,89.444,943.25
+Central African Republic,CAF,68.579,723.21
+Chad,TCD,75.583,797.07
+Comoros,COM,68.297,720.24
+"Congo, Dem. Rep.",COD,71.059,749.37
+"Congo, Rep.",COG,105.016,"1,107.47"
+Côte d'Ivoire,CIV,65.477,690.5
+Equatorial Guinea,GNQ,71.536,754.4
+Eswatini,SWZ,60.828,641.47
+Ethiopia,ETH,59.896,631.64
+Gabon,GAB,79.842,841.99
+"Gambia, The",GMB,66.398,700.21
+Ghana,GHA,73.976,780.13
+Guinea,GIN,76.066,802.17
+Guinea-Bissau,GNB,61.424,647.76
+Kenya,KEN,53.051,559.46
+Lesotho,LSO,60.46,637.59
+Liberia,LBR,64.915,684.57
+Madagascar,MDG,65.257,688.18
+Malawi,MWI,79.175,834.95
+Mali,MLI,66.12,697.28
+Mauritania,MRT,63.277,667.3
+Mauritius,MUS,71.409,753.06
+Mozambique,MOZ,59.171,624
+Namibia,NAM,71.847,757.68
+Niger,NER,61.701,650.68
+Nigeria,NGA,80.854,852.66
+Rwanda,RWA,80.666,850.68
+São Tomé and Principe,STP,75.544,796.66
+Senegal,SEN,68.753,725.05
+Seychelles,SYC,86.032,907.27
+Sierra Leone,SLE,79.669,840.16
+South Africa,ZAF,57.764,609.16
+Sudan,SDN,49.974,527.01
+Tanzania,TZA,88.986,938.42
+Togo,TGO,65.248,688.08
+Uganda,UGA,73.829,778.58
+Zambia,ZMB,64.298,678.07
+Zimbabwe,ZWE,82.21,866.96
