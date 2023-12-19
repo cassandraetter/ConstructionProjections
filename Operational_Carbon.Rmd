@@ -1,0 +1,119 @@
+---
+title: "Operational_Carbon"
+author: "Cassandra Etter"
+date: '2023-12-13'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Operational Carbon Projections 
+
+This is the third tranche of work which builds on the indicators RMkdwn in this project. It takes Building stock estimates to 2050 and adds operational carbon estimates. Please refer to first mkdown for earlier work. 
+
+Overview: Data for GlobalABC Project on construction and building indicators and projections
+This is the repository containing the source code and documentation for the Global ABC baseline assessment and indicators and projections for gap analysis. 
+The point of the project is to 
+1) gain a good understanding of the context 
+2) identify challenges and opportunities and 
+3) measure the objective achievement gap. 
+
+The project was carried out by UNOPS.
+
+##Import library
+```{r}
+library(data.table)
+library(dplyr)
+library(countrycode)
+library(readxl)
+library(tidyr)
+library(googlesheets4)
+library(tidyverse)
+library(wbstats)
+library(WDI)
+```
+
+##Load Dataset --Clean Cooking Access % 
+
+Pull WHO dataset on primary reliance on clean fuels and technology for cooking which has figures for 1990 - 2021 for 191 countries at the urban/rural/ total % levels. 
+Source: https://www.who.int/data/gho/data/indicators/indicator-details/GHO/gho-phe-primary-reliance-on-clean-fuels-and-technologies-proportion 
+```{r }
+cooking <- read_csv("cooking.csv") 
+
+##create a growth rate function for use. 
+cooking <- cooking %>%
+        select(SpatialDimValueCode, Period, Dim1, FactValueNumeric) %>%
+        arrange(SpatialDimValueCode, Dim1, Period) %>%
+        rename("iso3c" = SpatialDimValueCode) 
+```
+
+##Create average growth rate for clean cooking access 
+
+To create a prediction to 2050 for this data we will take the growth rate for each year between 1990 - 2021 and then find the average growth rate over that period for urban, rural, and total %. 
+
+```{r}
+cooking_total <- cooking %>%
+        filter(Dim1 == "Total") %>%
+        mutate(growth_rate = (FactValueNumeric/lag(FactValueNumeric)) / 100) %>%
+        group_by(iso3c) %>%
+        summarise(average_growth = mean(growth_rate[!is.infinite(growth_rate)], na.rm = TRUE))
+
+cooking_rural <- cooking %>%
+        filter(Dim1 == "Rural") %>%
+        mutate(growth_rate = (FactValueNumeric/lag(FactValueNumeric)) / 100 ) %>%
+        group_by(iso3c) %>%
+        summarise(average_growth = mean (growth_rate[!is.infinite(growth_rate)], na.rm = TRUE)) 
+        
+cooking_urban <- cooking %>%
+        filter(Dim1 == "Urban") %>%
+        mutate(growth_rate = (FactValueNumeric/lag(FactValueNumeric)) /100 ) %>%
+        group_by(iso3c) %>%
+        summarise(average_growth = mean(growth_rate[!is.infinite(growth_rate)], na.rm = TRUE))
+
+cooking_total_merged <- cooking %>%
+        filter(Period == 2020 & Dim1 == "Total" ) %>%
+        left_join(cooking_total, by = "iso3c")
+
+cooking_rural_merged <- cooking %>%
+        filter(Period == 2020 & Dim1 == "Rural") %>%
+        left_join(cooking_rural, by = "iso3c")
+
+cooking_urban_merged <- cooking %>%
+        filter(Period == 2020 & Dim1 == "Urban") %>%
+        left_join(cooking_urban, by = "iso3c")
+```
+
+##Predict to 2050 using average growth rate 
+```{r}
+years_to_predict <- seq(2020, 2050, by = 1)
+
+cooking_rural_2050 <- cooking_rural_merged %>%
+        crossing(year = years_to_predict) %>%
+        mutate(Access = pmin( FactValueNumeric * (1 + average_growth) ^ (year - 2020), 100)) %>%
+        rename(Rural_Access = Access) %>%
+        select(iso3c, year, Rural_Access)
+
+cooking_urban_2050 <- cooking_urban_merged %>%
+        crossing(year = years_to_predict) %>%
+        mutate(Access = pmin(FactValueNumeric * (1 + average_growth) ^ (year - 2020), 100)) %>%
+        rename(Urban_Access = Access) %>%
+        select(iso3c, year, Urban_Access)
+
+cooking_total_2050 <- cooking_total_merged %>%
+        crossing(year = years_to_predict) %>%
+        mutate(Access = pmin(FactValueNumeric * (1 + average_growth) ^ (year - 2020), 100)) %>%
+        rename(Total_Access = Access) %>%
+        select(iso3c, year, Total_Access)
+###merge datasets back together 
+Access_Percent <- cooking_total_2050 %>%
+        left_join(cooking_urban_2050, by = c("iso3c", "year")) %>%
+        left_join(cooking_rural_2050, by = c("iso3c", "year"))
+```
+
+Access_Percent is the final dataset used in the projections. 
+
+### Annual Building Stock Operational Energy Consumption (KWh)
+
+For operational data, we need to have some understanding of electricity and fuel use withiin the building sector. A 2020 paper 
