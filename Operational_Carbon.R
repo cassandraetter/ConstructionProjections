@@ -168,21 +168,35 @@ Direct_Carbon_Emissions <- Global_Buildings_Data %>%
 
 ###approach to 2050 taking operational emissions to be constant. building floor space to change of total emissions 
 
-bs_2050 <- read_csv("BS_2050.csv") %>%
+bs_2050 <- read_csv("~/Downloads/BS_2050.csv") %>%
         select(`Country Name`, `iso3c`, year, `total_building_stock_m2` ) 
-        
+
 
 operational_2050 <- bs_2050 %>%
-        left_join(Final_Energy, by = "iso3c") %>%
-        left_join(Total_Carbon, by = "iso3c") %>%
-        left_join(Direct_Carbon_Emissions, by = "iso3c") %>%
-        rename("Building Energy Consumption (toe)" = tCO2e.x, "Building Carbon Emissions (tCO2e)" = tCO2e.y, "Direct Building Emissions (tCO2e)"= tCO2e) %>%
-        mutate("BEC (toe/m2)" = `Building Energy Consumption (toe)`/ `total_building_stock_m2`, "BCE (tCO2e/m2)" = `Building Carbon Emissions (tCO2e)` / `total_building_stock_m2`, "DBE (tCO2e/m2)" = `Direct Building Emissions (tCO2e)` / `total_building_stock_m2`) %>%
-        select(`Country Name`, `iso3c`,`year`, `total_building_stock_m2`, `Building Energy Consumption (toe)`, `BEC (toe/m2)`,`Building Carbon Emissions (tCO2e)`, `BCE (tCO2e/m2)`, `Direct Building Emissions (tCO2e)` , `DBE (tCO2e/m2)`) 
+        %>%
+        # rename("Building Energy Consumption (toe)" = tCO2e.x, "Building Carbon Emissions (tCO2e)" = tCO2e.y, "Direct Building Emissions (tCO2e)"= tCO2e) %>%
+        mutate(`BEC (toe/m2)` = `Building Energy Consumption (toe)`/ `total_building_stock_m2`, 
+               `BCE (tCO2e/m2)` = `Building Carbon Emissions (tCO2e)` / `total_building_stock_m2`, 
+               `DBE (tCO2e/m2)` = `Direct Building Emissions (tCO2e)` / `total_building_stock_m2`) %>%
+        select(`Country Name`, `iso3c`,`year`, `total_building_stock_m2`, `Building Energy Consumption (toe)`, 
+               `BEC (toe/m2)`,`Building Carbon Emissions (tCO2e)`, `BCE (tCO2e/m2)`, 
+               `Direct Building Emissions (tCO2e)` , `DBE (tCO2e/m2)`)
 
 
-
-
+final_bs <- bs_2050 %>% filter(year == 2020) %>%
+        left_join(Final_Energy %>% select(iso3c, `Building Energy Consumption (toe)` = tCO2e), by = "iso3c") %>%
+        left_join(Total_Carbon %>% select(iso3c, `Building Carbon Emissions (tCO2e)` = tCO2e), by = "iso3c") %>%
+        left_join(Direct_Carbon_Emissions %>% select(iso3c, `Direct Building Emissions (tCO2e)` = tCO2e), by = "iso3c") %>%
+        mutate(`BEC (toe/m2)` = `Building Energy Consumption (toe)`/ `total_building_stock_m2`, 
+               `BCE (tCO2e/m2)` = `Building Carbon Emissions (tCO2e)` / `total_building_stock_m2`, 
+               `DBE (tCO2e/m2)` = `Direct Building Emissions (tCO2e)` / `total_building_stock_m2`) %>%
+        select(iso3c, `BEC (toe/m2)`, `BCE (tCO2e/m2)`, `DBE (tCO2e/m2)`) %>%
+        left_join(bs_2050, by = "iso3c") %>%
+        mutate(`Building Energy Consumption (toe)` = `BEC (toe/m2)` * total_building_stock_m2,
+               `Building Carbon Emissions (tCO2e)` = `BCE (tCO2e/m2)` * total_building_stock_m2,
+               `Direct Building Emissions (tCO2e)` = `DBE (tCO2e/m2)` * total_building_stock_m2) %>%
+        arrange(iso3c, year) %>%
+        select(`Country Name`, iso3c, year, everything())
 
 
 ###this provides a 2017 figure for Final Energy Consumption, Total Carbon Emissions, and Direct Carbon Emissions. To find 2050 estimate need to secure how they are projected to decrease or increase to 2050. 
