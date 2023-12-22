@@ -166,7 +166,7 @@ We now have data for 2017, but need to project out to 2050. We decide here to ma
 ```{r}
 ###approach to 2050 taking operational emissions to be constant. building floor space to change of total emissions 
 
-bs_2050 <- read_csv("Data/BS_2050.csv") %>%
+bs_2050 <- read_csv("Data/BS_2050_v2.csv") %>%
         select(`Country Name`, `iso3c`, year, `total_building_stock_m2` ) 
 
 final_bs <- bs_2050 %>% filter(year == 2020) %>%
@@ -198,7 +198,7 @@ We are, however, lacking 50+ countries which need to be added manually using a r
 
 #Need rate of change information for Total Carbon (Total, Residential, Commercial, Buildings)
 
-#Europe and Central Asia
+#Europe and Central Asia 
 #Middle East and North Africa
 #Sub saharan Africa
 #LATAM and Caribbean
@@ -216,5 +216,5 @@ access <- read_csv("Data/Access_2050.csv") %>%
 operational_2050_combined <- access %>% 
         left_join(final_bs, by = c("iso3c", "year"))
 
-write_csv(operational_2050_combined, "Operational_Emissions_Estimates.csv") 
+write_csv(operational_2050_combined, "Data/Operational_Emissions_Estimates.csv") 
 ```
