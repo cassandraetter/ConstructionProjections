@@ -40,7 +40,7 @@ library(WDI)
 Pull WHO dataset on primary reliance on clean fuels and technology for cooking which has figures for 1990 - 2021 for 191 countries at the urban/rural/ total % levels. 
 Source: https://www.who.int/data/gho/data/indicators/indicator-details/GHO/gho-phe-primary-reliance-on-clean-fuels-and-technologies-proportion 
 ```{r }
-cooking <- read_csv("cooking.csv") 
+cooking <- read_csv("Data/cooking.csv") 
 
 ##create a growth rate function for use. 
 cooking <- cooking %>%
@@ -118,7 +118,7 @@ Access_Percent is the final dataset used in the projections.
 
 Starting point for this analysis is IEA's estimates for 2017 on Building Operational Emissions for 138 countries. This data was pulled from a data file from (Guo 2020) "Global comparison of building energy use data within the context of climate change". 
 ```{r}
-Global_Buildings_Data <- read_excel("Global_Buildings_Data.xlsx") %>%
+Global_Buildings_Data <- read_excel("Data/Global_Buildings_Data.xlsx") %>%
         rename(Country = 1) %>%
         mutate(iso3c = countrycode(Country, "country.name", "iso3c")) %>%
         subset(Country != "Kosovo" & Country != "World") 
@@ -166,20 +166,8 @@ We now have data for 2017, but need to project out to 2050. We decide here to ma
 ```{r}
 ###approach to 2050 taking operational emissions to be constant. building floor space to change of total emissions 
 
-bs_2050 <- read_csv("~/Downloads/BS_2050.csv") %>%
+bs_2050 <- read_csv("Data/BS_2050.csv") %>%
         select(`Country Name`, `iso3c`, year, `total_building_stock_m2` ) 
-        
-
-operational_2050 <- bs_2050 %>%
-         %>%
-        # rename("Building Energy Consumption (toe)" = tCO2e.x, "Building Carbon Emissions (tCO2e)" = tCO2e.y, "Direct Building Emissions (tCO2e)"= tCO2e) %>%
-        mutate(`BEC (toe/m2)` = `Building Energy Consumption (toe)`/ `total_building_stock_m2`, 
-               `BCE (tCO2e/m2)` = `Building Carbon Emissions (tCO2e)` / `total_building_stock_m2`, 
-               `DBE (tCO2e/m2)` = `Direct Building Emissions (tCO2e)` / `total_building_stock_m2`) %>%
-        select(`Country Name`, `iso3c`,`year`, `total_building_stock_m2`, `Building Energy Consumption (toe)`, 
-               `BEC (toe/m2)`,`Building Carbon Emissions (tCO2e)`, `BCE (tCO2e/m2)`, 
-               `Direct Building Emissions (tCO2e)` , `DBE (tCO2e/m2)`)
-
 
 final_bs <- bs_2050 %>% filter(year == 2020) %>%
   left_join(Final_Energy %>% select(iso3c, `Building Energy Consumption (toe)` = tCO2e), by = "iso3c") %>%
@@ -217,4 +205,16 @@ We are, however, lacking 50+ countries which need to be added manually using a r
 #East Asia and Pacific
 #South Asia
 #North America
+```
+
+Combine that dataset with our cooking estimates earlier for the operational carbon sheet to be imported to google sheets. 
+
+```{r}
+access <- read_csv("Data/Access_2050.csv") %>%
+        rename("iso3c" = "Country", "year" = "Year")
+
+operational_2050_combined <- access %>% 
+        left_join(final_bs, by = c("iso3c", "year"))
+
+write_csv(operational_2050_combined, "Operational_Emissions_Estimates.csv") 
 ```

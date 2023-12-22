@@ -288,8 +288,8 @@ BS_2050 <- merged_2050_2 %>%
         mutate(average_household_size = as.numeric(`Average household size (number of members)`)) %>%
         mutate(num_households = Population/ average_household_size) %>%
         mutate(gdp_per_capita = GDP / Population) %>%
-        mutate(avg_m2_house = gdp_per_capita / 1000) %>%
-        mutate(residential_building_stock_m2 = num_households * avg_m2_house) %>%
+        mutate(avg_m2_capita = gdp_per_capita / 1000) %>%
+        mutate(residential_building_stock_m2 = Population * avg_m2_capita) %>%
         mutate(total_building_stock_m2 = residential_building_stock_m2 * 2 )
 
 head(BS_2050)
@@ -297,6 +297,33 @@ head(BS_2050)
 
 ###Check estimates ###
 
-To check 2050 estimates, we use data from Modelling Global Material Stocks and Flows for Residential and Service Sector buildings to 2050 (Deetman et.al. 2020) which includes estimates on sqm to 2050 for regions of the world. It also includes some further disaggregation for select countries, so we compare estimates for Canada and Japan. We find that our estimates are 23% and 10% lower respectively, which is likely due to Deetman et. al.  including full building sqm (high-rise and apartments included in their estimates. 
+To check 2050 estimates, we use data from Modelling Global Material Stocks and Flows for Residential and Service Sector buildings to 2050 (Deetman et.al. 2020) which includes estimates on sqm to 2050 for regions of the world. It also includes some further disaggregation for select countries, so we compare estimates for Canada and Japan. We find that our estimates are 23% lower and 10% higher respectively, which is likely due to Deetman et. al. including full building sqm (high-rise and apartments included in their estimates. 
 
+```{r}
+Deetman_SQM_Projections <- read_excel("Data/Deetman_SQM_Projections.xlsx", 
+                                      sheet = "sqmeters_output")
+View(Deetman_SQM_Projections)
+##Pull for Canada = Region 1  Japan = 23 India = 18 US = 2
+select_countries <- (c(1, 2, 18, 23))
+Deetman_Select <- Deetman_SQM_Projections %>%
+        filter(Region %in% select_countries) %>%
+        select(Region, type, area, `2030`, `2050`) 
+Sum_row <- Deetman_Select %>%
+        group_by(Region) %>%
+        summarise(`2030` = sum(`2030`), `2050` = sum(`2050`)) %>%
+        mutate(type = "Total")
+Deetman_select_Sum <- bind_rows(Deetman_Select, Sum_row) %>%
+        mutate(bas_sqm_2030 = `2030` * 1000000) %>%
+        mutate(base_sqm_2050 = `2050` * 1000000) %>%
+        filter(type == "Total")
+### Data in Million sqm need to make in sqm for comparison 
+```
+Our Estimates: Canada 2030= 4033394549 and 2050 = 5016870370
+Our Estimates: Japan 2030 =  10792050499 and 2050 = 11131133830
+Our Estimates: India  2030 = 30230094337 and 2050 = 63935008264
+Our Estimates: United States 2030 = 48898569289 and 2050 = 63147062557
 
+Deetman Estimates: Canada 2030  = 3243734575 and 2050 = 4080272736
+Deetman Estimates: Japan 2030 = 7180523606 and 2050 = 7096909732
+Deetman Estimates: India 2030 = 26023014912 and 2050 = 50647169731
+Deetman Estimates: US 2030 = 30100197194 and 2050 = 34277734689

@@ -72,10 +72,29 @@ We now pull subset for Construction, Manufacture of cement, lime and plaster, Ma
 list_substet <-c("Manufacture of cement, lime and plaster", "Aluminium production" ,"Construction (45)","Manufacture of basic iron and steel and of ferro-alloys and first products thereof")
 subset_exio_ghg <- exio_ghg %>% subset(sector %in% list_substet)
 ```
+
+We use this to create variable for construction emissions intensity and building emissions intensity 
+```{r}
+Building_intensity <- subset_exio_ghg %>%
+        subset(sector %in% c("Manufacture of cement, lime and plaster", "Aluminium production","Manufacture of basic iron and steel and of ferro-alloys and first products thereof")) %>%
+        group_by(iso3) %>%
+        summarise(
+                Building_GHG_Intensity = sum(ghg_int),
+                Building_GHG_Total = sum(ghg_tot)
+        ) %>%
+        rename(iso3c = iso3)
+Construction_intensity <-subset_exio_ghg %>%
+        subset( sector %in% "Construction (45)") %>%
+        rename(
+                Construction_GHG_Intensity = ghg_int,
+                Construction_GHG_Total = ghg_tot,
+                iso3c = iso3
+        )
+```
+
 ##Import ICP Data on Costs
 
 We now use the World Bank's International Comparison Programme data. This data collects comparative price data and detailed GDP expenditures to produce a PPP. This will allow us to take the import/ export data from above and allow for comparison across different countries. All goods are benchmarked to 2017.
-
 
 
 For missing country data, we apply the listed regional assumptions. We then compare all countries against one country for the comparison, and select Germany as the country selected does not matter for the analysis. Regional assumptions and their comparison cost are below: 
@@ -91,25 +110,18 @@ World (Other) 	100	1,054.57
 
 
 ```{r}
-Construction <- read_csv("construction_costs.csv") 
-
-```
-
-##Estimate Embodied Emissions of buildings and construction 
-
-Bring in building stock information from first Markdown and add in construction intensity data
-
-```{r}
-BS_2050 <- read.csv("BS_2050.csv")
+construction_costs <- read_csv("Data/construction_costs.csv") 
+BS_2050 <- read.csv("BS_2050_v2.csv")
 
 Costs_2 <- BS_2050 %>%
         left_join(construction_costs, by = "iso3c") %>%
         select(c(Country.Name, iso3c, year, total_building_stock_m2, `Construction Comparative`)) %>%
-        mutate(Total_Cost = total_building_stock_m2 * `Construction Comparative`) %>%
-        rename(iso3c = iso3)
+        mutate(Total_Cost = total_building_stock_m2 * `Construction Comparative`)
 ```
 
-Add building intensity data to this dataset 
+##Estimate Embodied Emissions of buildings and construction 
+
+Bring in building stock information from first Markdown and add in construction intensity data add building intensity data to this dataset 
 
 ```{r}
 Embodied_Carbon <- Costs_2 %>%
@@ -126,6 +138,39 @@ Latin America and Caribbean	487166.6121	13408428.28
 Middle East and North Africa	938445.1	15011385
 North America	284101.1124	8734324.867
 Sub Saharan Africa	899792.8	62727133
+South Asia      576581.4669 14274132.53
 
 ```{r}
-Embodied_Carbon <- read_csv("Embodied_Carbon.csv")
+Embodied_Carbon_wRegion <- Embodied_Carbon %>%
+          mutate(region = countrycode(sourcevar = iso3c, origin = "iso3c", destination = "region"))
+
+regional_averages <- data.frame(
+        region = c("East Asia & Pacific", "Europe & Central Asia", "Latin America & Caribbean", "Middle East & North Africa", "North America", "Sub-Saharan Africa", "South Asia"), 
+        avg_construction_intensity = c(367489.6482, 429531.0633, 487166.6121, 938445.1, 8734324.867, 899792.8, 576581.4669), 
+        avg_building_intensity = c(14047106.88, 4688629.699, 13408428.28, 15011385, 8734324.867, 62727133, 14274132.53))
+
+Embodied_Carbon_v2 <- Embodied_Carbon_wRegion %>%
+  left_join(regional_averages, by = "region") %>%
+  mutate(
+    Construction_Intensity = ifelse(is.na(Construction_GHG_Intensity), avg_construction_intensity, Construction_GHG_Intensity),
+    Building_Intensity = ifelse(is.na(Building_GHG_Intensity), avg_building_intensity, Building_GHG_Intensity)
+  ) %>%
+  select(-avg_construction_intensity, -avg_building_intensity)
+```
+
+Combine together the various data and put in the same unit of measure for a Ttoal Embodied Carbon Buildings (TCO2e) and Total Embodied Carbon Construction (TCO2e)
+
+```{r}
+Embodied_Carbon_v2 <- Embodied_Carbon_v2 %>%
+        mutate(Embodied_Carbon_Buildings = `Total_Cost`/ 1000000 * `Building_Intensity` / 1000) %>%
+        mutate(Embodied_Carbon_Construction = `Total_Cost` /1000000 * `Construction_Intensity` / 1000) %>%
+        select(`Country.Name`, iso3c, year, total_building_stock_m2, `Construction Comparative`, Total_Cost, Construction_Intensity, Building_Intensity, Embodied_Carbon_Buildings, Embodied_Carbon_Construction)
+
+```
+
+Final data used is here under Embodied_Carbon_v2.csv 
+
+```{r}
+write_csv(Embodied_Carbon_v2, "Data/Embodied_Carbon_v2.csv")
+```
+
