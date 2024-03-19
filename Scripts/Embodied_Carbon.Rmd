@@ -167,7 +167,10 @@ Embodied_Carbon_v2 <- Embodied_Carbon_v2 %>%
         select(`Country.Name`, iso3c, year, total_building_stock_m2, `Construction Comparative`, Total_Cost, Construction_Intensity, Building_Intensity, Embodied_Carbon_Buildings, Embodied_Carbon_Construction)
 
 ```
-##Urban Land Area -- Spatial and Urban Development Embodied Carbon 
+
+### Average annual embodied carbon per m2 (4.2) -- 
+
+##Urban Land Area -- Spatial and Urban Development Embodied Carbon (2.1)
 Now we turn to urban and spatial development area and the urban land area. To calculate this we take the World Bank urban land area data and apply the world urbanization prospectus change rate for urban to each country. 
 Dataset 1: World bank -- urban land area (sq.km) at 5 year intervals. We pull most recent observation from 2015. 
 
@@ -175,6 +178,14 @@ Dataset 1: World bank -- urban land area (sq.km) at 5 year intervals. We pull mo
 
 ```
 
+### Urban Population Density -- Spatial and Urban Development Embodied Carbon (2.2)
+
+
+### Carbon emissions of construction materials nationally produced and consumed (5.1) 
+
+### Carbon emissions of imported construction materials (5.2)
+
+### Ratio of nationally produced and imported construction materials (5.3)
 
 Final data used is here under Embodied_Carbon_v2.csv 
 

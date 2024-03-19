@@ -207,6 +207,11 @@ We are, however, lacking 50+ countries which need to be added manually using a r
 #North America
 ```
 
+
+### Average annual operational carbon per m2 (3.2) -- Existing Buildings
+
+Divide the final operational carbon estimate out per m2 to provide a BAU estimate of existing buildign per m2, and help with estimates for reducing oeprational emissions 
+
 Combine that dataset with our cooking estimates earlier for the operational carbon sheet to be imported to google sheets. 
 
 ```{r}
@@ -218,3 +223,14 @@ operational_2050_combined <- access %>%
 
 write_csv(operational_2050_combined, "Data/Operational_Emissions_Estimates.csv") 
 ```
+
+### Proportion of renewable energy in electricity production  -- Spatial and Urban Development (2.3)
+
+### Proportion of Electricity in Energy Mix -- Spatial and Urban Development (2.4)
+
+### Population with Access to Electricity (rural and urban) -- Spatial and Urban Development (2.5)
+
+
+
+
+
