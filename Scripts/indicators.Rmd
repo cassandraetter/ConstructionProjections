@@ -30,7 +30,7 @@ library(wbstats)
 library(WDI)
 library(readr)
 library(remotes)
-library(wpp2022)
+#library(wpp2022)
 library(countrycode)
 library(ggplot2)
 library(fabletools)
@@ -71,7 +71,7 @@ To retrieve average household size, I use UNDESA Data in baseyear 2020. As the d
 
 ##importing average household size 
 ```{r}
-undesa_pd_2022_hh_size_composition <- read_excel("Data/undesa_pd_2022_hh-size-composition.xlsx", 
+undesa_pd_2022_hh_size_composition <- read_excel("~/ConstructionProjections/Data/undesa_pd_2022_hh-size-composition.xlsx", 
                                                  sheet = "HH size and composition 2022", 
                                                  range = "A5:E1064")
 average_household <- undesa_2022 <- read_excel("~/Documents/GlobalABC project/undesa_2022.xlsx", 
@@ -159,7 +159,8 @@ Pop_2050$Population = as.numeric(Pop_2050$Population)
 colnames(Pop_2050)[2]<- "iso3c"
 Pop_2050 <- Pop_2050 %>%
         mutate(year = year(cool_year)) %>%
-        select(`Country Name`, iso3c, Population, year)
+        select(`Country Name`, iso3c, Population, year) %>%
+        arrange(iso3c, year)
 
 ```
 ###Calculate projection for GDP (PPP) ## 
@@ -167,7 +168,8 @@ Pop_2050 <- Pop_2050 %>%
 To find an estimate for predictions of GDP (PPP current international $) to 2050, we use IIASA's SSP scenarios. SSPs estimate growth rate at 5 year intervals out to 2100. We derive a growth rate between the five year increments and providing an annual growth rate for our years of interest (2020-2050). 
 
 ```{r}
-ssp_scenarios <- read_excel("Data/2023-11-19 - IIASA SSP scenarios.xlsx") %>% as.data.table %>%
+ssp_scenarios <-read_excel("~/ConstructionProjections/Data/IIASA.xlsx")%>% 
+        as.data.table %>%
         select( -Variable, -Model) %>%
         mutate(iso3c = countrycode(Region, "country.name", "iso3c")) %>%
         pivot_longer(cols = starts_with("2"), names_to = "year", values_to = "count") %>%
@@ -279,20 +281,36 @@ merged_2050_2 <- merged_2050 %>%
         select(c(1,2, 3, 4, 5, 11, 12)) %>%
         drop_na('gdp_ppp')
 head(merged_2050_2)
+
+rm(merged_2050, undesa_2022, undesa_pd_2022_hh_size_compositions, ssp_gdp, ssp_scenarios, Total_pop_2050, Population, population_projection, GDP_Filt_2050, gdp_per_capita, average_household, Pop_2050, undesa_pd_2022_hh_size_composition)
 ```
 
-##calculate floor space estimate using projections data 
+##calculate residential floor space estimate using projections data 
 
 ```{r}
-BS_2050 <- merged_2050_2 %>%
+residential <- merged_2050_2 %>%
         mutate(average_household_size = as.numeric(`Average household size (number of members)`)) %>%
         mutate(num_households = Population/ average_household_size) %>%
         mutate(gdp_per_capita = GDP / Population) %>%
         mutate(avg_m2_capita = gdp_per_capita / 1000) %>%
-        mutate(residential_building_stock_m2 = Population * avg_m2_capita) %>%
-        mutate(total_building_stock_m2 = residential_building_stock_m2 * 2 )
+        mutate(residential_building_stock_m2 = Population * avg_m2_capita) 
 
-head(BS_2050)
+head(residential)
+```
+#### Add regional Weights for total building stock ####
+
+Based on advisory group feedback, add weights for countries on the percent residential vs non residential floor space for each country. Outside of OECD, this number was very difficult to find. We rely on ''Material requirements and impacts of the building sector in the Shared Social Pathways'' by H.M Le Boulzec (2023) from the Journal of Cleaner Production. The estimates provide a residential vs non-residential regional estimate of building floor space between now and 2100 at a five year interval based on SSP 2. 
+```{r}
+weights <- read_excel("~/ConstructionProjections/Data/weights.xlsx")
+
+
+BS_2050 <- residential %>%
+  select(Country = `Country Name`, iso3c, year, population,average_household_size,num_households, gdp_per_capita,avg_m2_capita, residential_building_stock_m2) %>%
+  left_join(read_excel("~/ConstructionProjections/Data/country_region.xlsx") %>% as.data.table, by = "Country") %>%
+  mutate(period = ((year - 2020) %/% 5) * 5 + 2020) %>%
+  left_join(read_excel("~/ConstructionProjections/Data/weights.xlsx") %>% as.data.table %>%
+              select(Region, residential), by = "Region") %>%
+  mutate(total_building_stock_m2 = as.numeric(residential_building_stock_m2) / as.numeric(residential))
 ```
 
 ###Check estimates ###
