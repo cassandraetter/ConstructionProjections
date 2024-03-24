@@ -285,7 +285,7 @@ head(merged_2050_2)
 rm(merged_2050, undesa_2022, undesa_pd_2022_hh_size_compositions, ssp_gdp, ssp_scenarios, Total_pop_2050, Population, population_projection, GDP_Filt_2050, gdp_per_capita, average_household, Pop_2050, undesa_pd_2022_hh_size_composition)
 ```
 
-##calculate residential floor space estimate using projections data 
+###calculate residential floor space estimate using projections data 
 
 ```{r}
 residential <- merged_2050_2 %>%
@@ -297,20 +297,21 @@ residential <- merged_2050_2 %>%
 
 head(residential)
 ```
-#### Add regional Weights for total building stock ####
+### Add regional Weights for total building stock ###
 
 Based on advisory group feedback, add weights for countries on the percent residential vs non residential floor space for each country. Outside of OECD, this number was very difficult to find. We rely on ''Material requirements and impacts of the building sector in the Shared Social Pathways'' by H.M Le Boulzec (2023) from the Journal of Cleaner Production. The estimates provide a residential vs non-residential regional estimate of building floor space between now and 2100 at a five year interval based on SSP 2. 
 ```{r}
-weights <- read_excel("~/ConstructionProjections/Data/weights.xlsx")
+weights <- read_excel("~/ConstructionProjections/Data/weights.xlsx")#Data from Boulzec paper 
 
 
 BS_2050 <- residential %>%
-  select(Country = `Country Name`, iso3c, year, population,average_household_size,num_households, gdp_per_capita,avg_m2_capita, residential_building_stock_m2) %>%
+  select(Country = `Country Name`, iso3c, year, residential_building_stock_m2) %>%
   left_join(read_excel("~/ConstructionProjections/Data/country_region.xlsx") %>% as.data.table, by = "Country") %>%
   mutate(period = ((year - 2020) %/% 5) * 5 + 2020) %>%
   left_join(read_excel("~/ConstructionProjections/Data/weights.xlsx") %>% as.data.table %>%
-              select(Region, residential), by = "Region") %>%
+              select(Region, period = Year, residential), by = c("Region", "period")) %>%
   mutate(total_building_stock_m2 = as.numeric(residential_building_stock_m2) / as.numeric(residential))
+
 ```
 
 ###Check estimates ###
@@ -318,7 +319,7 @@ BS_2050 <- residential %>%
 To check 2050 estimates, we use data from Modelling Global Material Stocks and Flows for Residential and Service Sector buildings to 2050 (Deetman et.al. 2020) which includes estimates on sqm to 2050 for regions of the world. It also includes some further disaggregation for select countries, so we compare estimates for Canada and Japan. We find that our estimates are 23% lower and 10% higher respectively, which is likely due to Deetman et. al. including full building sqm (high-rise and apartments included in their estimates. 
 
 ```{r}
-Deetman_SQM_Projections <- read_excel("Data/Deetman_SQM_Projections.xlsx", 
+Deetman_SQM_Projections <- read_excel("~/ConstructionProjections/Data/Deetman_SQM_Projections.xlsx", 
                                       sheet = "sqmeters_output")
 View(Deetman_SQM_Projections)
 ##Pull for Canada = Region 1  Japan = 23 India = 18 US = 2
@@ -334,14 +335,26 @@ Deetman_select_Sum <- bind_rows(Deetman_Select, Sum_row) %>%
         mutate(bas_sqm_2030 = `2030` * 1000000) %>%
         mutate(base_sqm_2050 = `2050` * 1000000) %>%
         filter(type == "Total")
+
 ### Data in Million sqm need to make in sqm for comparison 
 ```
-Our Estimates: Canada 2030= 4033394549 and 2050 = 5016870370
-Our Estimates: Japan 2030 =  10792050499 and 2050 = 11131133830
-Our Estimates: India  2030 = 30230094337 and 2050 = 63935008264
-Our Estimates: United States 2030 = 48898569289 and 2050 = 63147062557
+Our Estimates: Canada 2030= 2877986259 and 2050 = 3608837481
+Our Estimates: Japan 2030 =  7312186774 and 2050 = 8179405377
+Our Estimates: India  2030 = 17421199324 and 2050 = 40354419577
+Our Estimates: United States 2030 = 34891059816 and 2050 = 45424232511
 
 Deetman Estimates: Canada 2030  = 3243734575 and 2050 = 4080272736
 Deetman Estimates: Japan 2030 = 7180523606 and 2050 = 7096909732
 Deetman Estimates: India 2030 = 26023014912 and 2050 = 50647169731
 Deetman Estimates: US 2030 = 30100197194 and 2050 = 34277734689
+
+For Canada we are 11.9% lower than the Deetman 2030 estimate 12.2% lower than the 2050 estimate
+For Japan we are 1.8% higher than Deetman 2030 estimate and 14% higher than the 2050 estimate
+For India we are 39% lower than Deetman2030 estimate and 22% lower than the 2050 estimate
+For the US we are 14% higher than Deetman 2030 and 27% higher than 2050 estimate 
+
+### Clean and export building stock estimates ###
+```{r}
+rm(building_stock_m2, Deetman_Select, Deetman_select_Sum, Deetman_SQM_Projections, merged_2050_2, Sum_row, weights)
+write_csv(BS_2050, "~/ConstructionProjections/Data/BS_2050.csv")
+```

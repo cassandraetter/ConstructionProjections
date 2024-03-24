@@ -1,0 +1,63 @@
+---
+title: "Inclusion_WellBeing"
+author: "Cassandra Etter"
+date: "2024-03-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Inclusion and Wellbeing Projections
+
+This is the fourth tranche of work which builds on the indicators related to wellbeing and inclusion.
+
+Overview: Data for GlobalABC Project on construction and building indicators and projections
+This is the repository containing the source code and documentation for the Global ABC baseline assessment and indicators and projections for gap analysis. 
+The point of the project is to 
+1) gain a good understanding of the context 
+2) identify challenges and opportunities and 
+3) measure the objective achievement gap. 
+
+The project was carried out by UNOPS.
+
+###import library
+```{r}
+library(data.table)
+library(dplyr)
+library(countrycode)
+library(readxl)
+library(tidyr)
+library(googlesheets4)
+library(tidyverse)
+```
+
+##2.7 -- Population living in a slum (% of urban Population) (2.7)
+Pull Data from UN Habitat on 2020 % of urban population living in slums
+Data from UN Habitat available here: https://data.unhabitat.org/pages/housing-slums-and-informal-settlements 
+
+Significant data missing, so apply the regional averages that UNH provide in the same dataset. 
+Central Asia and Southern Asia	48.2
+Eastern and South-Eastern Asia	21.7
+Europe and Northern America	0.7
+Latin America and The Carbbean	17.7
+Western Asia and Northern Africa	18.7
+Oceania	15.3
+Sub Saharan Africa	50.2
+```{r}
+Slum <- read_excel("Data/UNH_Slum_Estimates_2000-2020.xlsx") %>%
+        mutate(iso3c = countrycode(Country, "country.name", "iso3c")) %>%
+        mutate( year = 2020) %>%
+        rename(`slum_2.7` = `2020`)
+head(Slum)
+
+Well_being_Final <- Slum %>%
+        select(Country, iso3c, year, slum_2.7)
+
+```
+## Number of people working in the renewable energy sector (5.5)
+
+```{r}
+
+```

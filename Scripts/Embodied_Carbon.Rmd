@@ -31,9 +31,11 @@ library(readxl)
 library(tidyr)
 library(googlesheets4)
 library(tidyverse)
+library(stringr)
+library(bit64)
 ```
 
-## Importing Datasets 
+## 4.1 Annual building stock embodied carbon emissions-- Existing Buildings
 
 To find embodied carbon estimates by country we use EXIOBASE3, a multi-regional input output database with access to 47 countries and 5 regions. 
 ```{r}
@@ -65,7 +67,7 @@ exio_ghg <- exio_ghg %>%
         mutate(Country = countrycode(iso3, "iso3c", "country.name"))
 ```
 
-##Pulling relevant products from MRIO 
+###Pulling relevant products from MRIO 
 
 We now pull subset for Construction, Manufacture of cement, lime and plaster, Manufacture of basic iron and steel and of ferro-alloys and first products thereof Aluminium production. This is based on UNOPS recommendation for these products accounting for most embodied emissions in buildings. 
 ```{r}
@@ -89,10 +91,11 @@ Construction_intensity <-subset_exio_ghg %>%
                 Construction_GHG_Intensity = ghg_int,
                 Construction_GHG_Total = ghg_tot,
                 iso3c = iso3
-        )
+        ) %>%
+  select(-Country)
 ```
 
-##Import ICP Data on Costs
+###Import ICP Data on Costs
 
 We now use the World Bank's International Comparison Programme data. This data collects comparative price data and detailed GDP expenditures to produce a PPP. This will allow us to take the import/ export data from above and allow for comparison across different countries. All goods are benchmarked to 2017.
 
@@ -110,13 +113,13 @@ World (Other) 	100	1,054.57
 
 
 ```{r}
-construction_costs <- read_csv("Data/construction_costs.csv") 
-BS_2050 <- read.csv("BS_2050_v2.csv")
+construction_costs <- read_csv("~/ConstructionProjections/Data/construction_costs.csv") 
+BS_2050 <- read.csv("~/ConstructionProjections/Data/BS_2050.csv")
 
 Costs_2 <- BS_2050 %>%
-        left_join(construction_costs, by = "iso3c") %>%
-        select(c(Country.Name, iso3c, year, total_building_stock_m2, `Construction Comparative`)) %>%
-        mutate(Total_Cost = total_building_stock_m2 * `Construction Comparative`)
+        left_join(construction_costs, by = c("Country","iso3c")) %>%
+        mutate(Total_Cost = total_building_stock_m2 * `Construction Comparative`) 
+
 ```
 
 ##Estimate Embodied Emissions of buildings and construction 
@@ -125,9 +128,9 @@ Bring in building stock information from first Markdown and add in construction 
 
 ```{r}
 Embodied_Carbon <- Costs_2 %>%
-        left_join(Construction_intensity, by = "iso3c") %>%
+        left_join(Construction_intensity, by =  "iso3c") %>%
         left_join(Building_intensity, by = "iso3c") %>%
-        select(c(Country.Name, iso3c, year, total_building_stock_m2, `Construction Comparative`, Total_Cost, 
+        select(c(`Country`, iso3c, year, total_building_stock_m2, `Construction Comparative`, Total_Cost, 
                  Construction_GHG_Intensity, Building_GHG_Intensity, ))
 ```
 From here there are a number of missing data that need to be added on embodied construction and building intensity. Take regional estimates and apply them to countries in that region. The regional figures provided are:  
@@ -164,32 +167,243 @@ Combine together the various data and put in the same unit of measure for a Ttoa
 Embodied_Carbon_v2 <- Embodied_Carbon_v2 %>%
         mutate(Embodied_Carbon_Buildings = `Total_Cost`/ 1000000 * `Building_Intensity` / 1000) %>%
         mutate(Embodied_Carbon_Construction = `Total_Cost` /1000000 * `Construction_Intensity` / 1000) %>%
-        select(`Country.Name`, iso3c, year, total_building_stock_m2, `Construction Comparative`, Total_Cost, Construction_Intensity, Building_Intensity, Embodied_Carbon_Buildings, Embodied_Carbon_Construction)
+        select(Country, iso3c, year, total_building_stock_m2, `Construction Comparative`, Total_Cost, Construction_Intensity, Building_Intensity, Embodied_Carbon_Buildings, Embodied_Carbon_Construction)
 
 ```
 
 ### Average annual embodied carbon per m2 (4.2) -- 
+
+Average annual embodied carbon is just an easier way of seeing emissions intensity per m2. Its a constant. 
+```{r}
+
+Embodied_FINAL <- Embodied_Carbon_v2 %>%
+  mutate(average_per_m2 = Embodied_Carbon_Buildings / total_building_stock_m2) %>%
+  rename(Embodied_Building_4.1 = Embodied_Carbon_Buildings,
+         Average_4.2 = average_per_m2) %>%
+  select(`Country`, iso3c, year, `Embodied_Building_4.1`, Average_4.2)
+
+```
 
 ##Urban Land Area -- Spatial and Urban Development Embodied Carbon (2.1)
 Now we turn to urban and spatial development area and the urban land area. To calculate this we take the World Bank urban land area data and apply the world urbanization prospectus change rate for urban to each country. 
 Dataset 1: World bank -- urban land area (sq.km) at 5 year intervals. We pull most recent observation from 2015. 
 
 ```{r}
+urban_land <- read.csv("~/ConstructionProjections/Data/NationalTotalUrbanArea_SSP2_2000-2100_v1.csv") %>%
+  pivot_longer(cols = -c(`ISO3v10`, Country), 
+               names_to = "year",
+               values_to = "km2") %>%
+  mutate(year = str_remove(year, "UrbAmt")) %>%
+  rename(iso3c = ISO3v10) %>%
+  filter(as.numeric(year) <= 2050) 
+
+urban_land$km2 <- as.numeric(urban_land$km2)
+urban_land$year <- as.numeric(urban_land$year)
+
+urban_annual <- CJ(year = 2000:2050, Country = unique(urban_land$Country)) %>%
+   mutate(base_year = ((year - 2000) %/% 10) * 10 + 2000) %>%
+  left_join(urban_land %>% select(Country, base_year = year, base_km2 = km2) %>%
+              mutate(annual_increase = (lead(base_km2) - base_km2) / 10), 
+            by = c("Country", "base_year")) %>%
+  # Special case for 2050
+  mutate(km2 = ifelse(year < 2050, base_km2 + annual_increase * (year - base_year), base_km2)) %>%
+  arrange(Country, year) %>%
+  left_join(urban_land %>% select(Country, iso3c) %>% unique, by = "Country")
+
+
+urban_annual <- urban_annual%>% arrange(Country, year) %>%
+  select(Country, iso3c, year, km2)
+
+Embodied_FINAL <- Embodied_FINAL %>%
+  left_join(urban_annual, by = c("Country", "iso3c", "year")) %>%
+  rename(`urb_land_2.1` = `km2`)
+```
+
+## Urban Population Density -- Spatial and Urban Development Embodied Carbon (2.2)
+
+First we take urban population projections at mid-year by country 1950 - 2050 (thousands) from World Urbanization Prospectus population.un.org. We then combine that with 4.1 to derive the urban density estimate. 
+
+```{r}
+urb_pop <- read_excel("~/ConstructionProjections/Data/WUP_UrbanPopulation_Projection.xls") %>%
+  pivot_longer(cols = -Country, 
+               names_to = "year",
+               values_to = "population") %>%
+   mutate(iso3c = Country %>% countrycode("country.name", "iso3c")) %>%
+  filter(as.numeric(year) >= 2020)
+
+urb_pop$year = as.numeric(urb_pop$year)
+  
+urb_density <- urb_pop %>%
+  left_join(urban_annual, by = c("Country", "iso3c", "year")) %>%
+  mutate(density_2.2 = (population * 1000) / km2) 
+
+
+Embodied_FINAL <- Embodied_FINAL %>%
+  left_join(urb_density, by = c("Country", "iso3c", "year")) %>%
+  select(-c(population, km2 ))
+
+rm(urb_density, urb_pop, urban_annual, urban_land, subset_exio_ghg, regional_averages, M_impact, exio_ghg, Embodied_Carbon, Embodied_Carbon_v2, Embodied_Carbon_wRegion, D_cba, D_cba_impact, Costs_2, Construction_intensity, construction_costs, Building_intensity, urb_pop)
+```
+
+## Carbon emissions of construction materials (5.1, 5.2, 5.3)
+
+Now move to embodied emissions of construction. This data was not clean at all, and exiobase3 did not provide country level emissions intensity or material intensity information to allow for global analysis. The modified approach was derived below after the first approach was too sporatic to move forward with due to lack of data. 
+
+```{r}
+# Emission intensity in tCO2 per ton of Non-Metallic Mineral
+exio3_F <- data.table(
+  iso2 = fread("~/Downloads/IOT_2022_ixi/satellite/F.txt", nrows = 1, header = FALSE)[1, ] %>%
+    unlist %>% tail(-1),
+  sector = fread("~/Downloads/IOT_2022_ixi/satellite/F.txt", nrows = 2)[1, ] %>% 
+    unlist %>% tail(-1),
+  non_metallic = fread("~/Downloads/IOT_2022_ixi/satellite/F.txt", skip = 3) %>%
+    .[str_detect(V1, "Domestic Extraction Used - Non-Metallic")] %>% select(-1) %>% as.matrix %>% colSums,
+  ghg = fread("~/Downloads/IOT_2022_ixi/satellite/F.txt", skip = 3) %>%
+    .[V1 %in% c("CO2 - combustion - air", "CH4 - combustion - air", "N2O - combustion - air",
+                "CO2 - non combustion - Cement production - air",
+                "CO2 - non combustion - Lime production - air")] %>% 
+    select(-1) %>% as.matrix %>% colSums
+)
+
+# Compute intensity
+# - non_metallic is in kt (thousand metric tons)
+# - ghg is in kg
+# Ensure that intensity is expressed in tCO2 per ton of material
+
+materials_ghg_intensity <- exio3_F[sector %in% c("Quarrying of stone", "Quarrying of sand and clay",
+                      "Mining of chemical and fertilizer minerals, production of salt, other mining and quarrying n.e.c."), 
+        .(non_metallic = sum(non_metallic) * 1e3)] %>% 
+  cbind(
+    exio3_F[sector %in% c("Quarrying of stone", "Quarrying of sand and clay",
+                          "Mining of chemical and fertilizer minerals, production of salt, other mining and quarrying n.e.c.")] %>%
+      .[, .(ghg_extraction = sum(ghg)/1e3)]
+  ) %>%
+  cbind(
+    exio3_F[sector %in% c("Manufacture of bricks, tiles and construction products, in baked clay",
+                          "Manufacture of cement, lime and plaster", "Re-processing of ash into clinker",
+                          "Manufacture of other non-metallic mineral products n.e.c.")] %>%
+      .[, .(ghg_prodution = sum(ghg)/1e3)]
+  ) %>%
+  mutate(ghg_int_extraction = ghg_extraction / non_metallic,
+         ghg_int_prodution  = ghg_prodution / non_metallic)
+
+ghg_int_extraction <- materials_ghg_intensity$ghg_int_extraction
+ghg_int_production <- materials_ghg_intensity$ghg_int_prodution
+
+```
+From here it is clear that ghg intensity of extraction and production are only available at global level. use the following as obtained from Exiobase 3 above, in tCO2 per ton of non-metallic minerals
+
+ghg_int_extraction <- 0.004537613
+ghg_int_production <- 0.124635
+
+###Add UNEP domestic material input information 
+
+Domestic material input is domestic extraction + physical imports (direct, territorial)
+```{r}
+ghg_int_extraction <- 0.004537613
+ghg_int_production <- 0.124635
+  
+Embodied_extraction <-  BS_2050 %>% 
+  # Will apply total building stock evolution over time to non-metallic minerals
+  left_join(BS_2050 %>% filter(year == 2020) %>%
+              select(Country, total_building_stock_m2_2022 = total_building_stock_m2), 
+            by = "Country") %>%
+  # Join UNEP data
+  left_join(
+    fread("~/Downloads/mfa4_export.csv")[
+      V3 %in% c("Domestic Extraction", "Imports") &
+        V2 == "Non-metallic minerals"
+    ] %>%
+      # Only keep 2022
+      select(Country = V1, Flow = V3, non_metallic = V58) %>%
+      dcast(Country ~ Flow, value.var = "non_metallic") %>%
+      mutate(`Domestic share` = `Domestic Extraction` / (`Domestic Extraction` + Imports)) %>%
+      rename(dom_non_metallic = `Domestic Extraction`,
+             imp_non_metallic = Imports),
+    by = "Country"
+  ) %>%
+  # Evolution over time of domestically extracted and imported non-metallic minerals
+  mutate(dom_non_metallic = dom_non_metallic * total_building_stock_m2 / total_building_stock_m2_2022,
+         imp_non_metallic = imp_non_metallic * total_building_stock_m2 / total_building_stock_m2_2022,
+         dom_non_metallic_ghg_extraction = dom_non_metallic * ghg_int_extraction,
+         dom_non_metallic_ghg_tot = dom_non_metallic * (ghg_int_extraction + ghg_int_production),
+         imp_non_metallic_ghg_extraction = imp_non_metallic * ghg_int_extraction,
+         imp_non_metallic_ghg_tot = imp_non_metallic * (ghg_int_extraction + ghg_int_production))
 
 ```
 
-### Urban Population Density -- Spatial and Urban Development Embodied Carbon (2.2)
-
-
-### Carbon emissions of construction materials nationally produced and consumed (5.1) 
-
-### Carbon emissions of imported construction materials (5.2)
-
-### Ratio of nationally produced and imported construction materials (5.3)
-
-Final data used is here under Embodied_Carbon_v2.csv 
+This version created serious problems. But keeping it for reference. Developed final method after trial and error for magic. 
+###Corrected Version of embodied construction without errors 
 
 ```{r}
-write_csv(Embodied_Carbon_v2, "Data/Embodied_Carbon_v2.csv")
+
+# Convert integer64 columns to numeric
+UNE_data <- UNE_data %>% mutate(across(where(is.integer64), as.numeric))
+
+# Perform calculations with the updated data frame
+Embodied_extraction <- BS_2050 %>% 
+  # Will apply total building stock evolution over time to non-metallic minerals
+  left_join(BS_2050 %>% filter(year == 2022) %>%
+              select(Country, total_building_stock_m2_2022 = TBS), 
+            by = "Country") %>%
+  # Join UNEP data
+  left_join(
+    UNE_data[
+      V3 %in% c("Domestic Extraction", "Imports") &
+        V2 == "Non-metallic minerals"
+    ] %>%
+      # Only keep 2022
+      select(Country = V1, Flow = V3, non_metallic = V58) %>%
+      dcast(Country ~ Flow, value.var = "non_metallic") %>%
+      mutate(`Domestic share` = `Domestic Extraction` / (`Domestic Extraction` + Imports)) %>%
+      rename(dom_non_metallic = `Domestic Extraction`,
+             imp_non_metallic = Imports),
+    by = "Country"
+  ) %>%
+  # Evolution over time of domestically extracted and imported non-metallic minerals
+  mutate(dom_non_metallic = dom_non_metallic * TBS / total_building_stock_m2_2022,
+         imp_non_metallic = imp_non_metallic * TBS / total_building_stock_m2_2022,
+         dom_non_metallic_ghg_extraction = dom_non_metallic * ghg_int_extraction,
+         dom_non_metallic_ghg_tot = dom_non_metallic * (ghg_int_extraction + ghg_int_production),
+         imp_non_metallic_ghg_extraction = imp_non_metallic * ghg_int_extraction,
+         imp_non_metallic_ghg_tot = imp_non_metallic * (ghg_int_extraction + ghg_int_production))
+
+```
+
+#### Review data and check it for completeness 
+
+```{r}
+select_countries <- c("India", "China", "Haiti", "Canada", "Zimbabwe", "United States")
+
+ggplot(Embodied_extraction %>% filter(Country %in% select_countries), aes(x = year, y= dom_non_metallic, group = Country, color = Country)) +
+  geom_line()
+
+ggplot(Embodied_extraction %>% filter(Country %in% select_countries), aes(x = year, y = dom_non_metallic_ghg_tot, group = Country, color = Country)) +
+  geom_line()
+```
+Discover if any missing variables. Discover that 19 countries are missing from dataset. Lao, St. Lucia, West Bank, Slovak Republic, Turkiye, United States, St. Vincent and the Grenadines, Vietnam, Yemen 
+
+```{r}
+NA_countries <- Embodied_extraction %>%
+  filter(is.na(dom_non_metallic_ghg_tot)) %>%
+  distinct(Country)
+print(NA_countries)
+```
+### Carbon emissions of imported construction materials (5.2)
+
+imp_non_metallic_ghg_tot = 5.2 
+### Ratio of nationally produced and imported construction materials (5.3)
+
+Domestic Share = 5.3
+
+Final data used is here under Embodied_FINAL.csv 
+
+```{r}
+
+Embodied_FINAL <- Embodied_FINAL %>%
+  left_join(Embodied_extraction, by = c("Country", "iso3c", "year")) %>%
+  select(Country, iso3c, year, urb_land_2.1, density_2.2, Embodied_Building_4.1, Average_4.2, Construction_5.1 = dom_non_metallic_ghg_tot, Const_Import_5.2 = imp_non_metallic_ghg_tot, Ratio_5.3 = `Domestic share`)
+
+write_csv(Embodied_FINAL, "~/ConstructionProjections/Data/Embodied_FINAL.csv")
 ```
 
