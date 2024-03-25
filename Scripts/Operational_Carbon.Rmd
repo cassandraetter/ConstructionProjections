@@ -40,7 +40,7 @@ library(WDI)
 Pull WHO dataset on primary reliance on clean fuels and technology for cooking which has figures for 1990 - 2021 for 191 countries at the urban/rural/ total % levels. 
 Source: https://www.who.int/data/gho/data/indicators/indicator-details/GHO/gho-phe-primary-reliance-on-clean-fuels-and-technologies-proportion 
 ```{r }
-cooking <- read_csv("Data/cooking.csv") 
+cooking <- read_csv("~/ConstructionProjections/Data/cooking.csv") 
 
 ##create a growth rate function for use. 
 cooking <- cooking %>%
@@ -85,7 +85,7 @@ cooking_urban_merged <- cooking %>%
         left_join(cooking_urban, by = "iso3c")
 ```
 
-##Predict to 2050 using average growth rate 
+###Predict to 2050 using average growth rate 
 ```{r}
 years_to_predict <- seq(2020, 2050, by = 1)
 
@@ -110,6 +110,8 @@ cooking_total_2050 <- cooking_total_merged %>%
 Access_Percent <- cooking_total_2050 %>%
         left_join(cooking_urban_2050, by = c("iso3c", "year")) %>%
         left_join(cooking_rural_2050, by = c("iso3c", "year"))
+
+rm(cooking, cooking_rural, cooking_rural_2050, cooking_rural_merged, cooking_total, cooking_total_2050, cooking_total_merged, cooking_urban, cooking_urban_2050, cooking_urban_merged)
 ```
 
 Access_Percent is the final dataset used in the projections. 
@@ -118,7 +120,7 @@ Access_Percent is the final dataset used in the projections.
 
 Starting point for this analysis is IEA's estimates for 2017 on Building Operational Emissions for 138 countries. This data was pulled from a data file from (Guo 2020) "Global comparison of building energy use data within the context of climate change". 
 ```{r}
-Global_Buildings_Data <- read_excel("Data/Global_Buildings_Data.xlsx") %>%
+Global_Buildings_Data <- read_excel("~/ConstructionProjections/Data/Global_Buildings_Data.xlsx") %>%
         rename(Country = 1) %>%
         mutate(iso3c = countrycode(Country, "country.name", "iso3c")) %>%
         subset(Country != "Kosovo" & Country != "World") 
@@ -128,6 +130,7 @@ We then need to create a regional identifier for each country because we will ha
 countries <- unique(Global_Buildings_Data$iso3c)
 regions <- countrycode(countries, "iso3c", "region")
 result <- data.frame(Country = countries, Region = regions)
+
 ```
 formatting data and adding a new column to align units 
 
@@ -166,23 +169,23 @@ We now have data for 2017, but need to project out to 2050. We decide here to ma
 ```{r}
 ###approach to 2050 taking operational emissions to be constant. building floor space to change of total emissions 
 
-bs_2050 <- read_csv("Data/BS_2050_v2.csv") %>%
-        select(`Country Name`, `iso3c`, year, `total_building_stock_m2` ) 
+bs_2050 <- BS_2050 %>%
+        select(`Country`, `iso3c`, year, TBS ) 
 
 final_bs <- bs_2050 %>% filter(year == 2020) %>%
   left_join(Final_Energy %>% select(iso3c, `Building Energy Consumption (toe)` = tCO2e), by = "iso3c") %>%
   left_join(Total_Carbon %>% select(iso3c, `Building Carbon Emissions (tCO2e)` = tCO2e), by = "iso3c") %>%
   left_join(Direct_Carbon_Emissions %>% select(iso3c, `Direct Building Emissions (tCO2e)` = tCO2e), by = "iso3c") %>%
-  mutate(`BEC (toe/m2)` = `Building Energy Consumption (toe)`/ `total_building_stock_m2`, 
-         `BCE (tCO2e/m2)` = `Building Carbon Emissions (tCO2e)` / `total_building_stock_m2`, 
-         `DBE (tCO2e/m2)` = `Direct Building Emissions (tCO2e)` / `total_building_stock_m2`) %>%
+  mutate(`BEC (toe/m2)` = `Building Energy Consumption (toe)`/ TBS, 
+         `BCE (tCO2e/m2)` = `Building Carbon Emissions (tCO2e)` / TBS, 
+         `DBE (tCO2e/m2)` = `Direct Building Emissions (tCO2e)` / TBS) %>%
   select(iso3c, `BEC (toe/m2)`, `BCE (tCO2e/m2)`, `DBE (tCO2e/m2)`) %>%
   left_join(bs_2050, by = "iso3c") %>%
-  mutate(`Building Energy Consumption (toe)` = `BEC (toe/m2)` * total_building_stock_m2,
-         `Building Carbon Emissions (tCO2e)` = `BCE (tCO2e/m2)` * total_building_stock_m2,
-         `Direct Building Emissions (tCO2e)` = `DBE (tCO2e/m2)` * total_building_stock_m2) %>%
+  mutate(`Building Energy Consumption (toe)` = `BEC (toe/m2)` * TBS,
+         `Building Carbon Emissions (tCO2e)` = `BCE (tCO2e/m2)` * TBS,
+         `Direct Building Emissions (tCO2e)` = `DBE (tCO2e/m2)` * TBS) %>%
   arrange(iso3c, year) %>%
-  select(`Country Name`, iso3c, year, everything())
+  select(`Country`, iso3c, year, everything())
 
 
 
@@ -194,17 +197,68 @@ UNOPS here decide to take full building carbon emissions and move forward with o
 We are, however, lacking 50+ countries which need to be added manually using a rate of change information for operational emissions. the following regional estimates are applied to the regions [STOPPING POINT FOR 2023]
 
 ```{r}
+operational <- final_bs %>%
+  select(Country, iso3c, year, TBS, `BCE (tCO2e/m2)`, `Building Carbon Emissions (tCO2e)`)
+
+Operational_NA <- unique(operational$Country[is.na(operational$`BCE (tCO2e/m2)`)])
+print(Operational_NA)
+
+
 ###this provides a 2017 figure for Final Energy Consumption, Total Carbon Emissions, and Direct Carbon Emissions. To find 2050 estimate need to secure how they are projected to decrease or increase to 2050. 
 
-#Need rate of change information for Total Carbon (Total, Residential, Commercial, Buildings)
+## Emissions data comes from Cliamte Watch 
+update_bce <- function(Country) {
+ case_when(
+   Country == "Afghanistan" ~((2.36* 1e6) / 109331385), 
+   Country == "Burundi" ~ ((0.02*1e6) / 11285939),
+   Country == "Burkina Faso" ~ ((0.38)*1e6/ 58567152), 
+   Country == "Bahamas, The" ~ ((0.33*1e6) / 15676774), 
+   Country == "Belize" ~ ((0.08*1e6) / 4293937), 
+   Country == "Barbados" ~((0.09*1e6)/ 5539634), 
+   Country == "Bhutan" ~ ((0.04*1e6)/ 12135655), 
+   Country == "Central African Republic"~ ((0.01*1e6)/ 5878243), 
+   Country == "Comoros" ~ ((0.04*1e6)/ 3379737), 
+   Country == "Cabo Verde" ~ ((0.05*1e6)/ 4824770), 
+   Country == "Djibouti" ~((0.08*1e6) / 6770493), 
+   Country == "Eritrea" ~ ((0.22)*1e6/ 7986846), 
+   Country == "Fiji" ~ ((0.10*1e6)/ 14384740), 
+   Country == "Guinea" ~ ((0.08*1e6) /44686594), 
+   Country == "Guinea-Bissau" ~ ((0.03*1e6)/ 44686594), 
+   Country == "Equatorial Guinea" ~ ((0.10*1e6)/31426463), 
+   Country == "Guyana" ~ ((0.11*1e6) / 21151331), 
+   Country == "Iceland" ~((0.01*1e6) / 27157808), 
+   Country == "Lao PDR" ~ ((0.49*1e6) / 80373174), 
+   Country == "Liberia" ~ ((0.02*1e6) / 8983806), 
+   Country == "St. Lucia" ~ ((0.03*1e6)/ 3021000), 
+   Country == "Lesotho" ~ ((0.12*1e6) / 6817516), 
+   Country == "Madagascar"~ ((1.74*1e6)/ 52683401), 
+   Country == "Maldives" ~ ((0.06*1e6) / 9915208), 
+   Country == "Mali" ~ ((0.12*1e6) / 58367482), 
+   Country == "Mauritania" ~ ((0.19*1e6) / 31096033), 
+   Country == "Malawi" ~ ((0.01*1e6) / 37518697), 
+   Country == "Oman" ~ ((14.83*1e6) / 220537981), 
+   Country == "Papua New Guinea" ~ ((0.16*1e6)/ 45343564), 
+   Country == "Rwanda" ~ ((1.02*1e6) / 35335322), 
+   Country == "Solomon Islands" ~( (0.00*1e6) / 2133212), 
+   Country == "Sierra Leonne" ~((0.00*1e6) / 16989335), 
+   Country == "Sao Tome and Principe" ~ ((0.01*1e6) / 1145122), 
+   Country == "Chad" ~((0.13*1e6)/ 32222764),
+   Country == "Turkmenistan" ~ ((13.85*1e6) / 136047498), 
+   Country == "Tonga" ~ ((0.01*1e6) / 856374.6), 
+   Country == "Uganda" ~ ((2.63*1e6)/ 130377187), 
+   Country == "St.Vincent and the Grenadines" ~ ((0.03*1e6)/ 2044746), 
+   Country == "Vanuatu" ~((0.00*1e6) / 1098117),
+   Country == "Samoa" ~ ((0.02*1e6) / 1346872), 
+   TRUE ~ NA_real_
+ ) }
 
-#Europe and Central Asia 
-#Middle East and North Africa
-#Sub saharan Africa
-#LATAM and Caribbean
-#East Asia and Pacific
-#South Asia
-#North America
+operational <- operational %>%
+  mutate(temp_BCE = update_bce(Country))
+
+operational$`BCE (tCO2e/m2)`[is.na(operational$`BCE (tCO2e/m2)`)] <- operational$temp_BCE[is.na(operational$`BCE (tCO2e/m2)`)]
+
+operational_FINAL <- operational %>%
+  mutate(operational_3.1 = `BCE (tCO2e/m2)` * TBS) 
 ```
 
 
@@ -215,22 +269,118 @@ Divide the final operational carbon estimate out per m2 to provide a BAU estimat
 Combine that dataset with our cooking estimates earlier for the operational carbon sheet to be imported to google sheets. 
 
 ```{r}
-access <- read_csv("Data/Access_2050.csv") %>%
-        rename("iso3c" = "Country", "year" = "Year")
+operational_projections_FINAL <- operational_FINAL %>%
+  select(Country,iso3c, year, operational_3.1, average_3.2 = `BCE (tCO2e/m2)`)
+write_csv(operational_projections_FINAL, "~/ConstructionProjections/Data/Operational_Projections_FINAL.csv") 
 
-operational_2050_combined <- access %>% 
-        left_join(final_bs, by = c("iso3c", "year"))
-
-write_csv(operational_2050_combined, "Data/Operational_Emissions_Estimates.csv") 
+rm(Average)
 ```
 
 ### Proportion of renewable energy in electricity production  -- Spatial and Urban Development (2.3)
 
+Use IRENA's Renewable energy percentage in electricity generation. This is a better estimate than capacity, as the load factors are already assumed in the estimate. Year selected is 2021 which is the last year available with data. For the 20 missing countries, we use the regional estimate also provided by IRENA. 
+
+```{r}
+RE_Generation <- read_xlsx("~/Downloads/RESHARE_20240325-140705.xlsx") %>%
+  select(- `2022`,-`2020`) %>%
+  rename(Country = `...1` ) %>%
+  mutate(iso3c = countrycode(Country,'country.name', 'iso3c'))
+
+Countries_in_BS <- data.table(Country = unique(BS_2050$Country), iso3c = unique(BS_2050$iso3c))
+
+RE_weights_Asia = c("KOR", "LAO", "VNM")#24.68
+RE_weights_Africa = c("COG", "EGY","GMB", "TZA") #22.4
+RE_weigths_CAmerica = c("BHS","LCA", "VCT")# 38.03
+RE_weights_Eurasia = c("KGZ", "MDA", "TUR")#25.15
+RE_weights_Europe = c("SVK")#39.27
+RE_weights_EU = c("")#36.92
+RE_weights_MiddleEast = c("IRN", "PSE", "YEM")#2.99
+RE_weight_NAmerica = c("USA")#25.56
+RE_weight_Oceania = ("")#34.26
+RE_weight_SouthAmerica = c("BOL")#69.33
+
+# Create a lookup table for regional weights
+weights_lookup <- data.frame(
+  iso3c = c(RE_weights_Asia, RE_weights_Africa, RE_weigths_CAmerica, 
+              RE_weights_Eurasia, RE_weights_Europe,
+              RE_weights_MiddleEast, RE_weight_NAmerica,
+              RE_weight_SouthAmerica),
+  Weight = c(rep(24.68, length(RE_weights_Asia)),
+             rep(22.4, length(RE_weights_Africa)),
+             rep(38.03, length(RE_weigths_CAmerica)),
+             rep(25.15, length(RE_weights_Eurasia)),
+             rep(39.27, length(RE_weights_Europe)),
+             rep(2.99, length(RE_weights_MiddleEast)),
+             rep(25.56, length(RE_weight_NAmerica)),
+             rep(69.33, length(RE_weight_SouthAmerica)))
+)
+
+RE_Elec_2.3 <- Countries_in_BS %>%
+ full_join(RE_Generation, by = c("Country", "iso3c")) %>%
+  left_join(weights_lookup, by= "iso3c")
+
+# Ensure that the "2021" column is of numeric type
+RE_Elec_2.3$`2021` <- as.numeric(RE_Elec_2.3$`2021`)
+
+# Create a new column "RE_2.3" based on conditions
+RE_Elec_2.3 <- within(RE_Elec_2.3, {
+  RE_2.3 <- ifelse(is.na(`2021`), `Weight`, `2021`)
+})
+
+Operational_NoProj_FINAL <- RE_Elec_2.3 %>%
+  select(Country,iso3c, RE_2.3)
+
+rm(RE_Elec_2.3, RE_Generation, weights_lookup,RE_weight_NAmerica, RE_weight_Oceania, RE_weight_SouthAmerica, RE_weights_Africa, RE_weights_Asia, RE_weights_EU, RE_weigths_CAmerica, RE_weights_Eurasia, RE_weights_Europe, RE_weights_MiddleEast)
+```
+
 ### Proportion of Electricity in Energy Mix -- Spatial and Urban Development (2.4)
+
+We use the World Bank Renewable energy consumption % of total final energy consumption. We choose this over generation as it tracks use rather than just production, which could be relevant for policymakers. We take the 2020 estimate provided by WB. 
+
+```{r}
+renewables_consumption <- wb_search("renewable")
+renewables_consumption <- wb_data("EG.FEC.RNEW.ZS", start_date = 2020, end_date = 2020)
+renewables_consumption <- renewables_consumption %>%
+  select(iso3c, re_consump_2.4 = EG.FEC.RNEW.ZS) 
+
+Operational_NoProj_FINAL <- Operational_NoProj_FINAL %>%
+  left_join(renewables_consumption, by =  "iso3c")
+
+rm(renewables_consumption)
+
+```
 
 ### Population with Access to Electricity (rural and urban) -- Spatial and Urban Development (2.5)
 
+Use Worldbank access to electricity data 
+```{r}
+elec <- wb_search("electricity")
+access_elec <- wb_data("EG.ELC.ACCS.ZS", start_date = 2020, end_date = 2020)
+access_elec <- access_elec %>%
+  select(iso3c, access_elec_2.5 = EG.ELC.ACCS.ZS)
+
+access_elec <- Operational_NoProj_FINAL %>%
+  left_join(access_elec, by ="iso3c")
+
+rural_access <- wb_data("EG.ELC.ACCS.RU.ZS", start_date = 2020, end_date = 2020)
+rural_access <- rural_access %>%
+  select(iso3c, rural_2.5 = EG.ELC.ACCS.RU.ZS)
+
+rural_access <- access_elec %>%
+  left_join(rural_access, by = "iso3c")
+
+urb_access<- wb_data("EG.ELC.ACCS.UR.ZS", start_date = 2020, end_date = 2020)
+urb_access <- urb_access %>%
+  select(iso3c, urban_2.5 = EG.ELC.ACCS.UR.ZS)
+
+Operational_NoProj_FINAL <- rural_access %>%
+  left_join(urb_access, by = "iso3c")
 
 
+```
+
+```{r}
+write_csv(Operational_NoProj_FINAL, "~/ConstructionProjections/Data/Operational_noprojections_FINAL.csv") 
+```
 
 

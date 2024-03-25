@@ -46,7 +46,7 @@ Western Asia and Northern Africa	18.7
 Oceania	15.3
 Sub Saharan Africa	50.2
 ```{r}
-Slum <- read_excel("Data/UNH_Slum_Estimates_2000-2020.xlsx") %>%
+Slum <- read_excel("~/ConstructionProjections/Data/UNH_Slum_Estimates_2000-2020.xlsx") %>%
         mutate(iso3c = countrycode(Country, "country.name", "iso3c")) %>%
         mutate( year = 2020) %>%
         rename(`slum_2.7` = `2020`)
@@ -57,7 +57,28 @@ Well_being_Final <- Slum %>%
 
 ```
 ## Number of people working in the renewable energy sector (5.5)
+IRENA's benefits employment data provides a 2022 estimate for all countries on total employment in renewable energy by technology. We take the aggregated ''all technologies'' estimate for our dashboard. 
+```{r}
+jobs <- read_xlsx("~/ConstructionProjections/Data/IRENA_RE_Jobs_Annual_Review_2023.xlsx") %>%
+        filter(Technology == "All technologies") %>%
+        mutate(iso3c = countrycode(`Country/area`, "country.name", "iso3c")) %>%
+        filter(!is.na(iso3c)) %>%
+        rename(`Country` = `Country/area`) 
+colnames(jobs)[3] <- "jobs"
+jobs <- jobs %>% 
+        select(Country, iso3c, Year, jobs) %>%
+        mutate(jobs_5.5 = jobs * 1000)
+```
+
+###Combine and finalize wellbeing and inclusion 
 
 ```{r}
+Well_being_Final <- Well_being_Final %>%
+        full_join(jobs, by = c("Country","iso3c")) %>%
+        select(Country, iso3c, slum_2.7, jobs_5.5)
 
+write_csv(Well_being_Final, "~/ConstructionProjections/Data/Well_being_FINAL.csv")
+
+
+rm(jobs, Well_being_Final_v2, Slum)
 ```

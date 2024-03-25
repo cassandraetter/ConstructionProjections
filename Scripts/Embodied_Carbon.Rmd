@@ -405,5 +405,7 @@ Embodied_FINAL <- Embodied_FINAL %>%
   select(Country, iso3c, year, urb_land_2.1, density_2.2, Embodied_Building_4.1, Average_4.2, Construction_5.1 = dom_non_metallic_ghg_tot, Const_Import_5.2 = imp_non_metallic_ghg_tot, Ratio_5.3 = `Domestic share`)
 
 write_csv(Embodied_FINAL, "~/ConstructionProjections/Data/Embodied_FINAL.csv")
+
+rm(Embodied_extraction, Embodied_extraction_v2, Embodied_FINAL_v2, exio3_F, materials_ghg_intensity, UNE_data, urb_pop)
 ```
 
