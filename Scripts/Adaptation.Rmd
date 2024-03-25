@@ -1,0 +1,142 @@
+---
+title: "Adaptation"
+author: "Cassandra Etter"
+date: "2024-03-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Adaptation Indicators
+
+This is the fifth tranche of work which builds on the indicators related to adaptation.
+
+Overview: Data for GlobalABC Project on construction and building indicators and projections
+This is the repository containing the source code and documentation for the Global ABC baseline assessment and indicators and projections for gap analysis. 
+The point of the project is to 
+1) gain a good understanding of the context 
+2) identify challenges and opportunities and 
+3) measure the objective achievement gap. 
+
+The project was carried out by UNOPS.
+
+## Import Libraries 
+```{r}
+
+library(tidyverse)
+library(dplyr)
+library(wbstats)
+library(readxl)
+library(countrycode)
+library(googlesheets4)
+library(forecast)
+```
+
+##2.6 - Population Affected by National Disaster in last three years (% of population)####
+
+We use EMDAT dat which tracks naturaldisasters and calculate for 2020- 2023 to find the number of people affected. we then turn this into a % of the total population. 
+
+To do this we will aggregate all natural disasters: Biological (ex. locust infestation) hydrological (ex. flood) meteorological (ex. storm) geophysical (Volcano or earthquake), or climatological (ex. wildfire). 
+
+We also aggregate number affected which is total deaths, injuries, and displaced people. 
+```{r}
+nat_disaster <- read_xlsx("~/Constructionprojections/Data/vulnerability_emdat.xlsx") 
+
+summary_nat <- nat_disaster%>%
+        group_by(Country, ISO) %>%
+        summarize(
+                total_events = n(),
+                total_affected = sum(`Total Affected`)
+        )
+print(nat_disaster)
+
+pop <- wb_search("TOTAL POPULATION")
+pop <- wb_data("SP.POP.TOTL", start_date = 2022, end_date = 2022)%>%
+        select(Country = country, iso3c, pop = SP.POP.TOTL)
+
+nat_disaster <- pop %>%
+        left_join(summary_nat, by = "Country") %>%
+        mutate(Percent = `total_affected` / pop)
+
+```
+
+Decision now to move to inform risk index metric as our data doesn't appear to be correct. 
+
+```{r}
+natural <- read_xlsx("~/ConstructionProjections/Data/NaturalDisaster_RiskIndex.xlsx") 
+natural <- head(natural, -2)
+
+Adaptation_Final <-natural %>%
+        select(Country = COUNTRY, iso3c = ISO3, nat_disaster_2.6 = `Natural Disasters % of total pop`)
+write_csv(Adaptation_Final, "~/ConstructionProjections/Data/Adaptation_FINAL.csv")
+```
+##Domestic Annual Extractionof non-metallic minerals 5.4
+Using UNEP resource panel global material flows database for estimates of projected resource extraction. 
+```{r}
+extraction <- read_csv("~/Downloads/mfa4_export (3).csv")
+extraction <- extraction %>%
+        select(-`Flow name`, - `Flow code`, - `Flow unit`) %>%
+        pivot_longer(!c(Country, Category), names_to = "year", values_to = "extraction" )
+
+
+extraction$year <- as.numeric(extraction$year)
+
+# Filter data for years up to 2020 (or any last historical year)
+historical_data <- extraction %>%
+  filter(year <= 2020)
+
+# Group by Country and Category, and fit linear regression model to historical data
+linear_models <- historical_data %>%
+  group_by(Country, Category) %>%
+  do(model = lm(extraction ~ year, data = .))
+
+# Create a data frame to store projected values
+projection_data <- data.frame(
+  Country = character(),
+  Category = character(),
+  Year = numeric(),
+  Extraction = numeric()
+)
+
+# For each country and category, predict extraction values for years 2021 to 2050
+for (i in seq_along(linear_models$model)) {
+  country <- linear_models$Country[i]
+  category <- linear_models$Category[i]
+  model <- linear_models$model[[i]]
+  
+  # Create data frame with years 2021 to 2050
+  future_years <- data.frame(year = 2021:2050)
+  
+  # Predict extraction values for future years using the linear regression model
+  # Ensure column names match the original data used to fit the model
+  names(future_years) <- c("year")
+  
+  # Predict extraction values for future years using the linear regression model
+  projected_values <- predict(model, newdata = future_years)
+  
+  # Append projected values to projection_data data frame
+  projection_data <- bind_rows(projection_data, data.frame(
+    Country = country,
+    Category = category,
+    Year = future_years$year,
+    Extraction = projected_values
+  ))
+}
+
+# Print the projected data
+print(projection_data)
+```
+
+After creating a linear projection, add in Iso3c and clean up for export. 
+
+```{r}
+Adaptation_Projection_Final <- projection_data%>%
+        mutate(iso3c = countrycode(Country, "country.name", "iso3c")) %>%
+        select(Country, iso3c, Year, extraction_5.4 = Extraction) 
+        
+
+write_csv(Adaptation_Projection_Final, "~/ConstructionProjections/Data/Adaptation_Projection_FINAL.csv")
+```
+
